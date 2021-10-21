@@ -1,6 +1,14 @@
 module NeuralPriorityOptimizer
-using NeuralVerification, LazySets, Parameters, DataStructures, LinearAlgebra, HDF5
-using NeuralVerification: compute_output, get_activation, TOL
+
+# only, if you want to use the local version of NeuralVerification,
+# if you want to use the official version, execute only
+#   using NeuralVerification, LazySets, Parameters, DataStructures, LinearAlgebra, HDF5
+#   using NeuralVerification: compute_output, get_activation, TOL
+# (without the . in front of NeuralVerification, without the include(...))
+include(joinpath(@__DIR__, "../../NeuralVerification.jl/src/NeuralVerification.jl"))
+using .NeuralVerification, LazySets, Parameters, DataStructures, LinearAlgebra, HDF5
+using .NeuralVerification: compute_output, get_activation, TOL
+
 using Convex, Mosek, MosekTools, JuMP, Gurobi
 import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE, JuMP.MOI.INFEASIBLE_OR_UNBOUNDED
 
