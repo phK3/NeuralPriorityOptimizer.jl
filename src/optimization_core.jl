@@ -105,21 +105,6 @@ function general_priority_optimization(start_cell::Hyperrectangle, overestimate_
                 print_progress(params.verbosity, i, lower_bound, best_lower_bound,
                                 lower_bound_threshold, value, cell, elapsed_time)
             end
-                """
-                if params.verbosity == 1
-                    println("i: ", i)
-                    println("lower bound: ", lower_bound)
-                    println("Interval: ", [best_lower_bound, value])
-                    println("max radius: ", max(radius(cell)))
-
-                    println("Cell low: ", low(cell))
-                    println("Cell high: ", high(cell))
-                    println("lower_bound: ", lower_bound)
-                    println("lower bound threshold: ", lower_bound_threshold)
-                elseif params.verbosity == 2
-                    println("i: ", i, " - ", [best_lower_bound, value], ", ", elapsed_time, " sec")
-                end
-                """
 
             if params.plotting && i % params.plot_frequency == 0
                 push!(params.history_vals, value)
