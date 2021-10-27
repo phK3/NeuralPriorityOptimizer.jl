@@ -1,7 +1,9 @@
 module NeuralPriorityOptimizer
 
 using NeuralVerification, LazySets, Parameters, DataStructures, LinearAlgebra, HDF5
-using NeuralVerification: compute_output, get_activation, TOL
+using NeuralVerification: compute_output, get_activation, TOL,
+                            SymbolicIntervalBounds, init_symbolic_interval_bounds, # added by me
+                            domain, split_symbolic_interval_bounds # added by me
 
 using Convex, Mosek, MosekTools, JuMP, Gurobi
 import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE, JuMP.MOI.INFEASIBLE_OR_UNBOUNDED
@@ -16,6 +18,11 @@ include("utils.jl")
 include("optimization_core.jl")
 include("optimization_wrappers.jl")
 include("additional_optimizers.jl")
+
+# added by me
+include("optimization_deep_poly_bounds.jl")
+
+
 export general_priority_optimization,
        PriorityOptimizerParameters,
        project_onto_range,
@@ -34,5 +41,6 @@ export general_priority_optimization,
        hookes_jeeves,
        get_acas_sets,
        mip_linear_value_only,
-       mip_linear_uniform_split
+       mip_linear_uniform_split,
+       optimize_linear_dpb # added by me
 end # module
