@@ -3,7 +3,7 @@
 """
 overestimate_cell : cell -> (val, cell_out) returns overestimate of value as well as cell propagated through the nn
 """
-function general_priority_optimization(start_cell::SymbolicIntervalBounds, overestimate_cell, achievable_value, params::PriorityOptimizerParameters, lower_bound_threshold, upper_bound_threshold, split)
+function general_priority_optimization(start_cell::AbstractSymbolicIntervalBounds, overestimate_cell, achievable_value, params::PriorityOptimizerParameters, lower_bound_threshold, upper_bound_threshold, split)
     # set timer
     t_start = time()
 
@@ -99,16 +99,25 @@ function general_priority_optimization(start_cell::SymbolicIntervalBounds, overe
 end
 
 
-function general_priority_optimization(start_cell::SymbolicIntervalBounds, relaxed_optimize_cell, evaluate_objective, params::PriorityOptimizerParameters, maximize; bound_threshold_realizable=(maximize ? Inf : -Inf), bound_threshold_approximate=(maximize ? -Inf : Inf), split=split_largest_interval)
+function general_priority_optimization(start_cell::AbstractSymbolicIntervalBounds, relaxed_optimize_cell,
+                                       evaluate_objective, params::PriorityOptimizerParameters,
+                                       maximize; bound_threshold_realizable=(maximize ? Inf : -Inf),
+                                       bound_threshold_approximate=(maximize ? -Inf : Inf),
+                                       split=split_largest_interval)
     if maximize
-        return general_priority_optimization(start_cell, relaxed_optimize_cell, evaluate_objective, params, bound_threshold_realizable, bound_threshold_approximate, split)
+        return general_priority_optimization(start_cell, relaxed_optimize_cell, evaluate_objective,
+                                             params, bound_threshold_realizable,
+                                             bound_threshold_approximate, split)
     else
         overestimate_cell = cell -> -relaxed_optimize_cell(cell)
         neg_evaluate_objective = cell -> begin
             input, result = evaluate_objective(cell)
             return input, -result
         end
-        x, lower, upper, steps = general_priority_optimization(start_cell, overestimate_cell, neg_evaluate_objective, params, -bound_threshold_realizable, -bound_threshold_approximate, split)
+        x, lower, upper, steps = general_priority_optimization(start_cell, overestimate_cell,
+                                                               neg_evaluate_objective, params,
+                                                               -bound_threshold_realizable,
+                                                               -bound_threshold_approximate, split)
         return x, -upper, -lower, steps
     end
 end
@@ -130,13 +139,29 @@ function optimize_linear_dpb(network, input_set, coeffs, params; maximize=true, 
 end
 
 
-function split_largest_interval(s::SymbolicIntervalBounds)
+function optimize_linear_dpfv(network, input_set, coeffs, params; maximize=true, solver=DeepPolyFreshVars())
+    min_sign_flip = maximize ? 1.0 : -1.0
+
+    initial_sym = init_symbolic_interval_fv(network, input_set, max_vars=solver.max_vars)
+
+    function approximate_optimize_cell(cell)
+        out_cell = forward_network(solver, network, cell)
+        val = min_sign_flip * ρ(min_sign_flip .* coeffs, out_cell)
+        return val, out_cell
+    end
+
+    achievable_value = cell -> (domain(cell).center, compute_linear_objective(network, domain(cell).center, coeffs))
+    return general_priority_optimization(initial_sym, approximate_optimize_cell, achievable_value, params, maximize)
+end
+
+
+function split_largest_interval(s::AbstractSymbolicIntervalBounds)
     largest_dimension = argmax(high(domain(s)) - low(domain(s)))
     return split_symbolic_interval_bounds(s, largest_dimension)
 end
 
-function split_multiple_times(cell::SymbolicIntervalBounds, n; split=split_largest_interval)
-    q = Queue{SymbolicIntervalBounds}()
+function split_multiple_times(cell::AbstractSymbolicIntervalBounds, n; split=split_largest_interval)
+    q = Queue{AbstractSymbolicIntervalBounds}()
     enqueue!(q, cell)
     for i in 1:n
         new_cells = split(dequeue!(q))
