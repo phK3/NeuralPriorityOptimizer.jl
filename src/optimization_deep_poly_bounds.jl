@@ -139,7 +139,8 @@ function optimize_linear_dpb(network, input_set, coeffs, params; maximize=true, 
 end
 
 
-function optimize_linear_dpfv(network, input_set, coeffs, params; maximize=true, solver=DeepPolyFreshVars())
+function optimize_linear_dpfv(network, input_set, coeffs, params; maximize=true, solver=DeepPolyFreshVars(),
+                              split=split_largest_interval)
     min_sign_flip = maximize ? 1.0 : -1.0
 
     initial_sym = init_symbolic_interval_fv(network, input_set, max_vars=solver.max_vars)
@@ -151,7 +152,7 @@ function optimize_linear_dpfv(network, input_set, coeffs, params; maximize=true,
     end
 
     achievable_value = cell -> (domain(cell).center, compute_linear_objective(network, domain(cell).center, coeffs))
-    return general_priority_optimization(initial_sym, approximate_optimize_cell, achievable_value, params, maximize)
+    return general_priority_optimization(initial_sym, approximate_optimize_cell, achievable_value, params, maximize, split=split)
 end
 
 
