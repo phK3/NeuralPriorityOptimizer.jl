@@ -156,6 +156,35 @@ function optimize_linear_dpfv(network, input_set, coeffs, params; maximize=true,
 end
 
 
+function get_initial_symbolic_interval(network, input_set, solver::DeepPolyBounds)
+    return init_symbolic_interval_bounds(network, input_set)
+end
+
+function get_initial_symbolic_interval(network, input_set, solver::DeepPolyFreshVars)
+    return init_symbolic_interval_fv(network, input_set, max_vars=solver.max_vars)
+end
+
+function get_initial_symbolic_interval(network, input_set, solver::DeepPolyHeuristic)
+    return init_symbolic_interval_heur(network, input_set, max_vars=solver.max_vars)
+end
+
+function optimize_linear_deep_poly(network, input_set, coeffs, params; maximize=true, solver=DeepPolyHeuristic(),
+                              split=split_largest_interval)
+    min_sign_flip = maximize ? 1.0 : -1.0
+
+    initial_sym = get_initial_symbolic_interval(network, input_set, solver)
+
+    function approximate_optimize_cell(cell)
+        out_cell = forward_network(solver, network, cell)
+        val = min_sign_flip * ρ(min_sign_flip .* coeffs, out_cell)
+        return val, out_cell
+    end
+
+    achievable_value = cell -> (domain(cell).center, compute_linear_objective(network, domain(cell).center, coeffs))
+    return general_priority_optimization(initial_sym, approximate_optimize_cell, achievable_value, params, maximize, split=split)
+end
+
+
 function split_largest_interval(s::AbstractSymbolicIntervalBounds)
     largest_dimension = argmax(high(domain(s)) - low(domain(s)))
     return split_symbolic_interval_bounds(s, largest_dimension)
