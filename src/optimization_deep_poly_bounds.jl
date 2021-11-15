@@ -172,15 +172,21 @@ function optimize_linear_deep_poly(network, input_set, coeffs, params; maximize=
                               split=split_largest_interval)
     min_sign_flip = maximize ? 1.0 : -1.0
 
+    # should we include the preprocessing in the timout???
+    network = merge_into_network(network, min_sign_flip .* coeffs)
+    network = NetworkNegPosIdx(network)
+
     initial_sym = get_initial_symbolic_interval(network, input_set, solver)
 
     function approximate_optimize_cell(cell)
         out_cell = forward_network(solver, network, cell)
-        val = min_sign_flip * ρ(min_sign_flip .* coeffs, out_cell)
+        # val = min_sign_flip * ρ(min_sign_flip .* coeffs, out_cell)
+        val = min_sign_flip * out_cell.ubs[end][1]
         return val, out_cell
     end
 
-    achievable_value = cell -> (domain(cell).center, compute_linear_objective(network, domain(cell).center, coeffs))
+    # achievable_value = cell -> (domain(cell).center, compute_linear_objective(network, domain(cell).center, coeffs))
+    achievable_value = cell -> (domain(cell).center, compute_output(network, domain(cell).center)[1])
     return general_priority_optimization(initial_sym, approximate_optimize_cell, achievable_value, params, maximize, split=split)
 end
 

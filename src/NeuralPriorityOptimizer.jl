@@ -4,7 +4,7 @@ using NeuralVerification, LazySets, Parameters, DataStructures, LinearAlgebra, H
 using NeuralVerification: compute_output, get_activation, TOL,
                             AbstractSymbolicIntervalBounds, init_symbolic_interval_bounds, # added by me
                             init_symbolic_interval_fv, domain, split_symbolic_interval_bounds, # added by me
-                            init_symbolic_interval_heur
+                            init_symbolic_interval_heur, merge_into_network, NetworkNegPosIdx
 using Convex, Mosek, MosekTools, JuMP, Gurobi
 import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE, JuMP.MOI.INFEASIBLE_OR_UNBOUNDED
 
