@@ -174,7 +174,7 @@ end
 
 
 function optimize_linear_deep_poly(network, input_set, coeffs, params; maximize=true, solver=DeepPolyHeuristic(),
-                              split=split_largest_interval)
+                              split=split_largest_interval, concrete_sample=:Center)
     min_sign_flip = maximize ? 1.0 : -1.0
 
     # should we include the preprocessing in the timout???
@@ -190,8 +190,29 @@ function optimize_linear_deep_poly(network, input_set, coeffs, params; maximize=
         return val, out_cell
     end
 
-    # achievable_value = cell -> (domain(cell).center, compute_linear_objective(network, domain(cell).center, coeffs))
-    achievable_value = cell -> (domain(cell).center, compute_output(network, domain(cell).center)[1])
+    if concrete_sample == :Center
+        achievable_value = cell -> (domain(cell).center, compute_output(network, domain(cell).center)[1])
+    else concrete_sample == :BoundsMaximizer
+        function achievable_value(cell)
+            x_star = maximizer(cell)
+            x_center = domain(cell).center
+
+            # merged NN should only have one output
+            y_star = compute_output(network, x_star)[1]
+            y_center = compute_output(network, x_center)[1]
+
+            if y_star > y_center
+                y = y_star
+                x = x_star
+            else
+                y = y_center
+                x = x_center
+            end
+
+            return x, y
+        end
+    end
+
     return general_priority_optimization(initial_sym, approximate_optimize_cell, achievable_value, params, maximize, split=split)
 end
 

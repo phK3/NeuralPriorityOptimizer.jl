@@ -6,7 +6,7 @@ using NeuralVerification: compute_output, get_activation, TOL,
                             init_symbolic_interval_fv, domain, split_symbolic_interval_bounds, # added by me
                             init_symbolic_interval_heur, merge_into_network, NetworkNegPosIdx, # added by me
                             AsymESIP, init_symbolic_interval_fvheur, split_symbolic_interval_fv_heur,
-                            SymbolicIntervalFVHeur
+                            SymbolicIntervalFVHeur, maximizer
 using Convex, Mosek, MosekTools, JuMP, Gurobi
 import JuMP.MOI.OPTIMAL, JuMP.MOI.INFEASIBLE, JuMP.MOI.INFEASIBLE_OR_UNBOUNDED
 
