@@ -168,6 +168,11 @@ function get_initial_symbolic_interval(network, input_set, solver::DeepPolyHeuri
     return init_symbolic_interval_heur(network, input_set, max_vars=solver.max_vars)
 end
 
+function get_initial_symbolic_interval(network, input_set, solver::DPNeurifyFV)
+    return init_symbolic_interval_fvheur(network, input_set, max_vars=solver.max_vars)
+end
+
+
 function optimize_linear_deep_poly(network, input_set, coeffs, params; maximize=true, solver=DeepPolyHeuristic(),
                               split=split_largest_interval)
     min_sign_flip = maximize ? 1.0 : -1.0
@@ -196,8 +201,24 @@ function split_largest_interval(s::AbstractSymbolicIntervalBounds)
     return split_symbolic_interval_bounds(s, largest_dimension)
 end
 
+function split_largest_interval(s::SymbolicIntervalFVHeur)
+    largest_dimension = argmax(high(domain(s)) - low(domain(s)))
+    return split_symbolic_interval_fv_heur(s, largest_dimension)
+end
+
 function split_multiple_times(cell::AbstractSymbolicIntervalBounds, n; split=split_largest_interval)
     q = Queue{AbstractSymbolicIntervalBounds}()
+    enqueue!(q, cell)
+    for i in 1:n
+        new_cells = split(dequeue!(q))
+        enqueue!(q, new_cells[1])
+        enqueue!(q, new_cells[2])
+    end
+    return q
+end
+
+function split_multiple_times(cell::SymbolicIntervalFVHeur, n; split=split_largest_interval)
+    q = Queue{SymbolicIntervalFVHeur}()
     enqueue!(q, cell)
     for i in 1:n
         new_cells = split(dequeue!(q))
