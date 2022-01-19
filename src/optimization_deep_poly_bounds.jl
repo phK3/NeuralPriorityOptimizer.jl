@@ -3,7 +3,8 @@
 """
 overestimate_cell : cell -> (val, cell_out) returns overestimate of value as well as cell propagated through the nn
 """
-function general_priority_optimization(start_cell::AbstractSymbolicIntervalBounds, overestimate_cell, achievable_value, params::PriorityOptimizerParameters, lower_bound_threshold, upper_bound_threshold, split)
+# start_cell::Union{AbstractSymbolicIntervalBounds, AsymESIP}
+function general_priority_optimization(start_cell, overestimate_cell, achievable_value, params::PriorityOptimizerParameters, lower_bound_threshold, upper_bound_threshold, split)
     # set timer
     t_start = time()
 
@@ -99,7 +100,8 @@ function general_priority_optimization(start_cell::AbstractSymbolicIntervalBound
 end
 
 
-function general_priority_optimization(start_cell::AbstractSymbolicIntervalBounds, relaxed_optimize_cell,
+# start_cell::Union{AbstractSymbolicIntervalBounds, AsymESIP}
+function general_priority_optimization(start_cell, relaxed_optimize_cell,
                                        evaluate_objective, params::PriorityOptimizerParameters,
                                        maximize; bound_threshold_realizable=(maximize ? Inf : -Inf),
                                        bound_threshold_approximate=(maximize ? -Inf : Inf),
