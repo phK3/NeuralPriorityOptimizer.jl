@@ -407,30 +407,30 @@ function get_acas_sets(property_number)
         output_set = HalfSpace([1.0, 0.0, 0.0, 0.0, 0.0], 3.9911256459)
     elseif property_number == 2
         input_set = Hyperrectangle(low=[0.6, -0.5, -0.5, 0.45, -0.5], high=[0.6798577687, 0.5, 0.5, 0.5, -0.45])
-        output_set = PolytopeComplement(HPolytope([-1.0 1.0 0.0 0.0 0.0; -1.0 0.0 1.0 0.0 0.0; -1.0 0.0 0.0 1.0 0.0; -1.0 0.0 0.0 0.0 1.0], [0.0; 0.0; 0.0; 0.0]))
+        output_set = Complement(HPolytope([-1.0 1.0 0.0 0.0 0.0; -1.0 0.0 1.0 0.0 0.0; -1.0 0.0 0.0 1.0 0.0; -1.0 0.0 0.0 0.0 1.0], [0.0; 0.0; 0.0; 0.0]))
     elseif property_number == 3
         input_set = Hyperrectangle(low=[-0.3035311561, -0.0095492966, 0.4933803236, 0.3, 0.3], high=[-0.2985528119, 0.0095492966, 0.5, 0.5, 0.5])
-        output_set = PolytopeComplement(HPolytope([1.0 -1.0 0.0 0.0 0.0; 1.0 0.0 -1.0 0.0 0.0; 1.0 0.0 0.0 -1.0 0.0; 1.0 0.0 0.0 0.0 -1.0], [0.0; 0.0; 0.0; 0.0]))
+        output_set = Complement(HPolytope([1.0 -1.0 0.0 0.0 0.0; 1.0 0.0 -1.0 0.0 0.0; 1.0 0.0 0.0 -1.0 0.0; 1.0 0.0 0.0 0.0 -1.0], [0.0; 0.0; 0.0; 0.0]))
     elseif property_number == 4
         input_set = Hyperrectangle(low=[-0.3035311561, -0.0095492966, 0.0, 0.3181818182, 0.0833333333], high=[-0.2985528119, 0.0095492966, 0.0, 0.5, 0.1666666667])
-        output_set = PolytopeComplement(HPolytope([1.0 -1.0 0.0 0.0 0.0; 1.0 0.0 -1.0 0.0 0.0; 1.0 0.0 0.0 -1.0 0.0; 1.0 0.0 0.0 0.0 -1.0], [0.0; 0.0; 0.0; 0.0]))
+        output_set = Complement(HPolytope([1.0 -1.0 0.0 0.0 0.0; 1.0 0.0 -1.0 0.0 0.0; 1.0 0.0 0.0 -1.0 0.0; 1.0 0.0 0.0 0.0 -1.0], [0.0; 0.0; 0.0; 0.0]))
     else
         @assert false "Unsupported property number"
-    end 
+    end
 
     return input_set, output_set
 end
 
-# zeroed_weights(act::ReLU, weights, activation) = 
+# zeroed_weights(act::ReLU, weights, activation) =
 # zeroed_weights(act::Id, weights, activation) = weights
 
-# iterate backwards through it so we never have to store a matrix, it's always in a vector form? 
+# iterate backwards through it so we never have to store a matrix, it's always in a vector form?
 function get_chained_gradient(network, x, output_grad)
     gradient = output_grad'
     activations = get_activation(network, vec(x))
     for (i, layer) in Iterators.reverse(enumerate(network.layers))
         # Corner case where all activations are 0, the gradient will now be 0
-        # and we can return directly 
+        # and we can return directly
         if sum(activations[i]) == 0
             return zeros(size(output_grad, 1), size(network.layers[1], 2))
         else
