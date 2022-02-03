@@ -197,15 +197,17 @@ function optimize_linear_deep_poly(network, input_set, coeffs, params; maximize=
     end
 
     if concrete_sample == :Center
-        achievable_value = cell -> (domain(cell).center, compute_output(network, domain(cell).center)[1])
+        # since we used min_sign_flip, when merging the coeffs into the NN, we need to
+        # add min_sign_flip here too
+        achievable_value = cell -> (domain(cell).center, min_sign_flip * compute_output(network, domain(cell).center)[1])
     else concrete_sample == :BoundsMaximizer
         function achievable_value(cell)
             x_star = maximizer(cell)
             x_center = domain(cell).center
 
             # merged NN should only have one output
-            y_star = compute_output(network, x_star)[1]
-            y_center = compute_output(network, x_center)[1]
+            y_star = min_sign_flip * compute_output(network, x_star)[1]
+            y_center = min_sign_flip * compute_output(network, x_center)[1]
 
             if y_star > y_center
                 y = y_star
