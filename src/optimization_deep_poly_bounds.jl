@@ -111,7 +111,11 @@ function general_priority_optimization(start_cell, relaxed_optimize_cell,
                                              params, bound_threshold_realizable,
                                              bound_threshold_approximate, split)
     else
-        overestimate_cell = cell -> -relaxed_optimize_cell(cell)
+        # overestimate_cell = cell -> -relaxed_optimize_cell(cell)
+        overestimate_cell = cell -> begin
+            val, out_cell = relaxed_optimize_cell(cell)
+            return -val, out_cell
+        end
         neg_evaluate_objective = cell -> begin
             input, result = evaluate_objective(cell)
             return input, -result
