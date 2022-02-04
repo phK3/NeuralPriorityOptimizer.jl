@@ -46,5 +46,7 @@ export general_priority_optimization,
        mip_linear_uniform_split,
        optimize_linear_dpb, # added by me
        optimize_linear_dpfv, # added by me
-       optimize_linear_deep_poly # added by me
+       optimize_linear_deep_poly, # added by me
+       contained_within_polytope_deep_poly,  # added by me
+       reaches_polytope_deep_poly  # added by me
 end # module
