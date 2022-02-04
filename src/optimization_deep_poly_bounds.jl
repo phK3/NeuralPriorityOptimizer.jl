@@ -225,6 +225,116 @@ function optimize_linear_deep_poly(network, input_set, coeffs, params; maximize=
 end
 
 
+"""
+Maximizes the violation of the polytope's constraints.
+
+Used to prove that the NN's output is contained in the polytope.
+
+If the upper bound on the maximum is < 0 -> contained in polytope.
+If we find a point that violates one constraint of the polytope -> not contained in polytope.
+"""
+function contained_within_polytope_deep_poly(network, input_set, polytope, params; solver=DPNeurifyFV(),
+                                            split=split_largest_interval, concrete_sample=:Center)
+    min_sign_flip = 1.  # we want to maximize violation of polytope to prove containment
+    A, b = tosimplehrep(polytope)
+    network = merge_into_network(network, A, b)
+    network = NetworkNegPosIdx(network)
+
+    initial_sym = get_initial_symbolic_interval(network, input_set, solver)
+
+    function approximate_optimize_cell(cell)
+        out_cell = forward_network(solver, network, cell)
+        violations = min_sign_flip * out_cell.ubs[end] # note: upper bounds
+        # after merging, if all constraints are satisifed, we have Ax - b ≤ 0
+        max_violation = maximum(violations)
+        return max_violation, out_cell
+    end
+
+    if concrete_sample == :Center
+        achievable_value = cell -> (domain(cell).center, maximum(compute_output(network, domain(cell).center)))
+    elseif concrete_sample == :BoundsMaximizer
+        function achievable_value(cell)
+            x_star = maximizer(cell)
+
+            if length(cell.ubs[end]) == 1
+                # there only is one constraint
+                y_star = compute_output(network, x_star)
+            else
+                # if there are multiple constraints, take maximizer of the one with the most potential
+                # i.e. the one with the largest upper bound
+                max_vio_idx = argmax(cell.ubs[end])
+                y_star = compute_output(network, x_star[max_vio_idx, :])
+            end
+
+            return x_star, maximum(y_star)
+        end
+    else
+        throw(ArgumentError("keyword ", concrete_sample, " does not exist!"))
+    end
+
+    # maximize = true,
+    # bound_threshold_realizable = 0 (-> if we find some concrete input x with NN(x) > 0, then we are not in the polytope)
+    # bound_threshold_approximate = 0 (-> if we can prove that NN(x) < 0 for all x, then we are guaranteed to be in the polytope)
+    return general_priority_optimization(initial_sym, approximate_optimize_cell, achievable_value, params, true,
+                                             split=split, bound_threshold_realizable=0., bound_threshold_approximate=0.)
+end
+
+
+"""
+Minimizes the violation of the polytope's constraints.
+
+Used to prove that NN's output is disjoint with the polytope.
+
+If the lower bound on the minimal violation is > 0 -> guaranteed to be outside polytope.
+If we find a point that satisfies all of the polytope's constraints -> intersects with polytope
+"""
+function reaches_polytope_deep_poly(network, input_set, polytope, params; solver=DPNeurifyFV(),
+                                    split=split_largest_interval, concrete_sample=:Center)
+    min_sign_flip = -1.  # we want to minimize violation of polytope to prove that we stay outside
+    A, b = tosimplehrep(polytope)
+    network = merge_into_network(network, A, b)
+    network = NetworkNegPosIdx(network)
+
+    initial_sym = get_initial_symbolic_interval(network, input_set, solver)
+
+    function approximate_optimize_cell(cell)
+        out_cell = forward_network(solver, network, cell)
+        violations = out_cell.lbs[end]  # note: lower bounds
+        # after merging, if all constraints are satisifed, we have Ax - b ≤ 0
+        max_violation = maximum(violations)
+        return max_violation, out_cell
+    end
+
+    if concrete_sample == :Center
+        achievable_value = cell -> (domain(cell).center, maximum(compute_output(network, domain(cell).center)))
+    elseif concrete_sample == :BoundsMaximizer
+        function achievable_value(cell)
+            x_star = minimizer(cell)
+
+            if length(cell.ubs[end]) == 1
+                # there only is one constraint
+                y_star = compute_output(network, x_star)
+            else
+                # if there are multiple constraints, take minimizer of the one that is closest to leaving the polytope
+                # i.e. the one with the largest lower bound
+                max_vio_idx = argmax(cell.lbs[end])
+                y_star = compute_output(network, x_star[max_vio_idx, :])
+            end
+
+            return x_star, maximum(y_star)
+        end
+    else
+        throw(ArgumentError("keyword ", concrete_sample, " does not exist!"))
+    end
+
+    # maximize = false,
+    # bound_threshold_realizable = 0 (-> if we find some concrete input x with NN(x) > 0, then we are not in the polytope)
+    # bound_threshold_approximate = 0 (-> if we can prove that NN(x) < 0 for all x, then we are guaranteed to be in the polytope)
+    return general_priority_optimization(initial_sym, approximate_optimize_cell, achievable_value, params, false,
+                                             split=split, bound_threshold_realizable=0., bound_threshold_approximate=0.)
+end
+
+
 function split_largest_interval(s::AbstractSymbolicIntervalBounds)
     largest_dimension = argmax(high(domain(s)) - low(domain(s)))
     return split_symbolic_interval_bounds(s, largest_dimension)
