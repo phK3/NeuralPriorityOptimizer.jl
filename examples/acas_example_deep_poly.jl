@@ -9,6 +9,8 @@ using NeuralVerification
 using LazySets
 using LinearAlgebra
 
+const NV = NeuralVerification
+
 # @assert Threads.nthreads()==1 "for benchmarking threads must be 1"
 # LinearAlgebra.BLAS.set_num_threads(1)
 
@@ -19,7 +21,7 @@ using LinearAlgebra
 Test ACAS network index1-index2 on property property_index with solver parameters given by params.
 p sets the norm to use for properties 2, 3, and 4 which project onto a polytope under that norm.
 """
-function test_acas_network(index1, index2, property_index, params; p=1)
+function test_acas_network(index1, index2, property_index, params, solver; split=split_largest_interval, concrete_sample=:Center)
     network_name = string("ACASXU_experimental_v2a_", index1, "_", index2, ".nnet")
     # Read in the network. Named CAS so as not to confuse with the official ACAS Xu tables.
     network_file = string(@__DIR__, "/../networks/CAS/", network_name)
@@ -31,9 +33,11 @@ function test_acas_network(index1, index2, property_index, params; p=1)
     # Solve the problem
     if output_set isa HalfSpace || output_set isa AbstractPolytope
         println("Checking if contained within polytope")
-        time = @elapsed x_star, lower_bound, upper_bound, steps = contained_within_polytope(network, input_set, output_set, params)
+        time = @elapsed x_star, lower_bound, upper_bound, steps = contained_within_polytope_deep_poly(network, input_set, output_set, params,
+                                                                                solver=solver, split=split, concrete_sample=concrete_sample)
     elseif output_set isa Complement{<:Number, <:AbstractPolytope}
-        time = @elapsed x_star, lower_bound, upper_bound, steps = reaches_polytope_binary(network, input_set, output_set.X, params)
+        time = @elapsed x_star, lower_bound, upper_bound, steps = reaches_polytope_deep_poly(network, input_set, output_set.X, params,
+                                                                                solver=solver, split=split, concrete_sample=concrete_sample)
     else
         @assert false "Haven't implemented reach polytope yet"
     end
@@ -104,10 +108,43 @@ function writeline(file, property_index, index_1, index_2, lower_bound, upper_bo
     println(file, string(property_index, ",", index_1, "-", index_2, ",", sat_string, ",", lower_bound, ",", upper_bound, ",", time, ",", steps))
 end
 
+
+function run_acas_verification(solver, properties_to_test, max_index_1, max_index_2, filename;
+                                max_steps=200000, timeout=60., split=NV.split_important_interval,
+                                concrete_sample=:BoundsMaximizer, verbosity=0, stop_gap=1e-4)
+
+    params = PriorityOptimizerParameters(max_steps=max_steps, verbosity=verbosity,
+                                            timeout=timeout, stop_gap=stop_gap) # added by me
+
+    full_time = @elapsed begin
+        lower_bounds = Array{Float64, 3}(undef, 4, 5, 9)
+        upper_bounds = Array{Float64, 3}(undef, 4, 5, 9)
+        times = Array{Float64, 3}(undef, 4, 5, 9)
+        steps = Array{Integer, 3}(undef, 4, 5, 9)
+        for property_index = 1:properties_to_test
+            for i = 1:max_index_1
+                for j = 1:max_index_2
+                    println("Property ", property_index, " Network ", i, "-", j)
+                    lower_bounds[property_index, i, j], upper_bounds[property_index, i, j], times[property_index, i, j], steps[property_index, i, j] = test_acas_network(i, j, property_index, params, solver, split=split, concrete_sample=concrete_sample)
+                    println()
+                end
+            end
+        end
+    end
+
+    println("Max steps: ", max_steps)
+    println("Full time: ", full_time)
+
+    print_results(lower_bounds, upper_bounds, times, steps, properties_to_test, max_index_1, max_index_2, params.stop_gap)
+    write_results(filename, lower_bounds, upper_bounds, times, steps, properties_to_test, max_index_1, max_index_2, params.stop_gap)
+end
+
+
+
 ###
 # Setup your parameters and then run the tests
 ###
-filename=string(@__DIR__, "/../results/CAS/acas_fullrun_onethread_binary.csv")
+filename=string(@__DIR__, "/../results/CAS/acas_fullrun_onethread_deep_poly.csv")
 # was commented out before, but printing doesn't work without it
 max_steps = 200000  # hard coded below now to be different for the properties
 timeout = 60.
@@ -116,40 +153,18 @@ properties_to_test = 4
 #max_index_2 = 9
 max_index_1 = 2
 max_index_2 = 2
-p = Inf  # added by me
+
+solver = DPNeurifyFV(max_vars=15, method=:DeepPolyRelax)
+split = NV.split_important_interval
+concrete_sample = :BoundsMaximizer
 
 #### just for precompilation
 println("precompilation ...")
 params = PriorityOptimizerParameters(max_steps=5, timeout=10.)
-test_acas_network(1, 1, 1, params, p=p)
-test_acas_network(1, 1, 2, params, p=p)
+test_acas_network(1, 1, 1, params, solver, split=split, concrete_sample=concrete_sample)
+test_acas_network(1, 1, 2, params, solver, split=split, concrete_sample=concrete_sample)
 
-params = PriorityOptimizerParameters(max_steps=200000, stop_frequency=100, verbosity=0, timeout=timeout) # added by me
-
-
-full_time = @elapsed begin
-    lower_bounds = Array{Float64, 3}(undef, 4, 5, 9)
-    upper_bounds = Array{Float64, 3}(undef, 4, 5, 9)
-    times = Array{Float64, 3}(undef, 4, 5, 9)
-    steps = Array{Integer, 3}(undef, 4, 5, 9)
-    for property_index = 1:properties_to_test
-	    params = PriorityOptimizerParameters(max_steps=200000, stop_frequency=100, verbosity=0, timeout=timeout)
-	    if property_index > 1
-		    params = PriorityOptimizerParameters(max_steps=50000, stop_frequency=100, verbosity=0, timeout=timeout)
-	    end
-        for i = 1:max_index_1
-            for j = 1:max_index_2
-                println("Property ", property_index, " Network ", i, "-", j)
-                lower_bounds[property_index, i, j], upper_bounds[property_index, i, j], times[property_index, i, j], steps[property_index, i, j] = test_acas_network(i, j, property_index, params; p=p)
-                println()
-            end
-        end
-    end
-end
-
-println("p norm: ", p)
-println("Max steps: ", max_steps)
-println("Full time: ", full_time)
-
-print_results(lower_bounds, upper_bounds, times, steps, properties_to_test, max_index_1, max_index_2, params.stop_gap)
-write_results(filename, lower_bounds, upper_bounds, times, steps, properties_to_test, max_index_1, max_index_2, params.stop_gap)
+println("starting evaluation")
+run_acas_verification(solver, properties_to_test, max_index_1, max_index_2, filename;
+                                max_steps=max_steps, timeout=timeout, split=split,
+                                concrete_sample=concrete_sample)
