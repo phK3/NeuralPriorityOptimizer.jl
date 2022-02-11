@@ -9,8 +9,8 @@ using NeuralVerification
 using LazySets
 using LinearAlgebra
 
-# @assert Threads.nthreads()==1 "for benchmarking threads must be 1"
-# LinearAlgebra.BLAS.set_num_threads(1)
+@assert Threads.nthreads()==1 "for benchmarking threads must be 1"
+LinearAlgebra.BLAS.set_num_threads(1)
 
 
 """
@@ -112,10 +112,10 @@ filename=string(@__DIR__, "/../results/CAS/acas_fullrun_onethread_binary.csv")
 max_steps = 200000  # hard coded below now to be different for the properties
 timeout = 60.
 properties_to_test = 4
-#max_index_1 = 5
-#max_index_2 = 9
-max_index_1 = 2
-max_index_2 = 2
+max_index_1 = 5
+max_index_2 = 9
+#max_index_1 = 2
+#max_index_2 = 2
 p = Inf  # added by me
 
 #### just for precompilation
