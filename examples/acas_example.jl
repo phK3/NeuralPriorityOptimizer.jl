@@ -107,7 +107,7 @@ end
 ###
 # Setup your parameters and then run the tests
 ###
-filename=string(@__DIR__, "/../results/CAS/acas_fullrun_onethread_binary.csv")
+filename=string(@__DIR__, "/../results/CAS/acas_fullrun_onethread_binary_stop1.csv")
 # was commented out before, but printing doesn't work without it
 max_steps = 200000  # hard coded below now to be different for the properties
 timeout = 60.
@@ -117,14 +117,16 @@ max_index_2 = 9
 #max_index_1 = 2
 #max_index_2 = 2
 p = Inf  # added by me
+stop_frequency = 1
+# stop_frequency = 100 # was default in GitHub
 
 #### just for precompilation
 println("precompilation ...")
-params = PriorityOptimizerParameters(max_steps=5, timeout=10.)
+params = PriorityOptimizerParameters(max_steps=5, timeout=10., stop_frequency=stop_frequency)
 test_acas_network(1, 1, 1, params, p=p)
 test_acas_network(1, 1, 2, params, p=p)
 
-params = PriorityOptimizerParameters(max_steps=200000, stop_frequency=100, verbosity=0, timeout=timeout) # added by me
+params = PriorityOptimizerParameters(max_steps=200000, verbosity=0, timeout=timeout, stop_frequency=stop_frequency) # added by me
 
 
 full_time = @elapsed begin
@@ -133,9 +135,9 @@ full_time = @elapsed begin
     times = Array{Float64, 3}(undef, 4, 5, 9)
     steps = Array{Integer, 3}(undef, 4, 5, 9)
     for property_index = 1:properties_to_test
-	    params = PriorityOptimizerParameters(max_steps=200000, stop_frequency=100, verbosity=0, timeout=timeout)
+	    params = PriorityOptimizerParameters(max_steps=max_steps, stop_frequency=stop_frequency, verbosity=0, timeout=timeout)
 	    if property_index > 1
-		    params = PriorityOptimizerParameters(max_steps=50000, stop_frequency=100, verbosity=0, timeout=timeout)
+		    params = PriorityOptimizerParameters(max_steps=max_steps, stop_frequency=stop_frequency, verbosity=0, timeout=timeout)
 	    end
         for i = 1:max_index_1
             for j = 1:max_index_2
