@@ -11,8 +11,8 @@ using LinearAlgebra
 
 const NV = NeuralVerification
 
-# @assert Threads.nthreads()==1 "for benchmarking threads must be 1"
-# LinearAlgebra.BLAS.set_num_threads(1)
+@assert Threads.nthreads()==1 "for benchmarking threads must be 1"
+LinearAlgebra.BLAS.set_num_threads(1)
 
 
 """
@@ -144,17 +144,18 @@ end
 ###
 # Setup your parameters and then run the tests
 ###
-filename=string(@__DIR__, "/../results/CAS/acas_fullrun_onethread_deep_poly.csv")
+filename=string(@__DIR__, "/../results/CAS/acas_fullrun_onethread_deep_poly_0_vars.csv")
 # was commented out before, but printing doesn't work without it
 max_steps = 200000  # hard coded below now to be different for the properties
 timeout = 60.
 properties_to_test = 4
-#max_index_1 = 5
-#max_index_2 = 9
-max_index_1 = 2
-max_index_2 = 2
+max_index_1 = 5
+max_index_2 = 9
+#max_index_1 = 2
+#max_index_2 = 2
 
-solver = DPNeurifyFV(max_vars=15, method=:DeepPolyRelax)
+#solver = DPNeurifyFV(max_vars=15, method=:DeepPolyRelax)
+solver = DPNeurifyFV(max_vars=0, method=:DeepPolyRelax)
 split = NV.split_important_interval
 concrete_sample = :BoundsMaximizer
 
