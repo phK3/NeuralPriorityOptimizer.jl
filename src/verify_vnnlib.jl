@@ -59,8 +59,9 @@ function generate_specs(rv)
             end
         end
 
-        return specs
     end
+
+    return specs
 end
 
 
