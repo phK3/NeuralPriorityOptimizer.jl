@@ -18,6 +18,13 @@ function generate_specs(rv)
     # returns list of specs
     # (input_set, output_set)
     specs = []
+    
+    if length(rv) > 1
+        println("WARNING: No efficient verification for disjunction of conjunctions of input spaces implemented yet!\n
+                     Creating multiple sub-problems.\n
+                     Check yourself, wether any element of the disjunction is satisfied!")
+    end
+
     for rv_tuple in rv
         l, u, output_specs = rv_tuple
 
@@ -69,22 +76,22 @@ function get_sat(type, lower_bound, upper_bound, stop_gap)
     if type == :contained_within_polytope
         if lower_bound > 0
             # at least one constraint of the polytope is violated! Have found a counterexample
-            println("SAT")
+            return "SAT"
         elseif upper_bound <= stop_gap
-            println("UNSAT")
+            return "UNSAT"
         else
-            println("inconclusive")
+            return "inconclusive"
         end
     elseif type == :reaches_polytope 
-        if upper_bound <= params.stop_gap
+        if upper_bound <= stop_gap
             # distance to polytope is smaller than allowed! Have found a counterexample
             # TODO: could return x_star as counterexample
-            println("SAT")
+            return "SAT"
         elseif lower_bound > 0
             # distance to polytope is larger than 0 (and stop_gap), property is proven
-            println("UNSAT")
+            return "UNSAT"
         else
-            println("inconclusive")
+            return "inconclusive"
         end
     else
         throw(ArgumentError("Unknown verification type $type !"))
@@ -103,6 +110,10 @@ function verify_vnnlib(network, vnnlib_file, params; solver=nothing, split=NV.sp
     rv = read_vnnlib_simple(vnnlib_file, n_in, n_out)
     specs = generate_specs(rv)
 
+    x_star = nothing
+    result = "inconclusive"
+    all_steps = 0
+    # if length(specs) > 1, we are dealing with a disjunction of constraints -> can abort, if we found one SAT
     for (input_set, output_set) in specs
 
         if output_set isa AbstractPolytope
@@ -125,10 +136,13 @@ function verify_vnnlib(network, vnnlib_file, params; solver=nothing, split=NV.sp
             @assert false "No implementation for output_set = $(output_set)"
         end
 
-        printing && println(result)
+        all_steps += steps
+
+        printing && println("Steps: ", steps, " - ", [lower_bound, upper_bound], " -> ", result)
+        result == "SAT" && break  # can terminate loop, if one term of the disjunction is true
     end
 
-    return x_star, lower_bound, upper_bound, steps
+    return x_star, all_steps, result
 end
 
 
