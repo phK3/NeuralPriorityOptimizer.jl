@@ -21,8 +21,7 @@ function generate_specs(rv)
     
     if length(rv) > 1
         println("WARNING: No efficient verification for disjunction of conjunctions of input spaces implemented yet!\n
-                     Creating multiple sub-problems.\n
-                     Check yourself, wether any element of the disjunction is satisfied!")
+                     Creating multiple sub-problems.")
     end
 
     for rv_tuple in rv
@@ -57,8 +56,7 @@ function generate_specs(rv)
         else
             # disjunction of conjunction of halfspaces
             println("WARNING: No efficient verification for disjunction of conjunctions of halfspaces implemented yet!\n
-                     Creating multiple sub-problems.\n
-                     Check yourself, wether any element of the disjunction is satisfied!")
+                     Creating multiple sub-problems.")
 
             for (A, b) in output_specs
                 output_set = Complement(HPolytope(A, b))
@@ -99,60 +97,36 @@ function get_sat(type, lower_bound, upper_bound, stop_gap)
 end
 
 
-## directly use specification for verification of property
-function verify_vnnlib(network, vnnlib_file, params; solver=nothing, split=NV.split_important_interval, concrete_sample=:BoundsMaximizer, max_vars=20, 
-                       method=:DeepPolyRelax, printing=true)
-    solver = isnothing(solver) ? DPNeurifyFV(method=method, max_vars=max_vars) : solver
+"""
+Verifies network for given vnnlib specification.
 
-    n_in = size(network.layers[1].weights, 2)
-    n_out = length(network.layers[end].bias)
+args:
+    solver - solver instance to use for verification
+    network - network instance
+    vnnlib_file - location of vnnlib specification file 
+    params - parameters for solver
 
-    rv = read_vnnlib_simple(vnnlib_file, n_in, n_out)
-    specs = generate_specs(rv)
+kwargs:
+    split - method to use for input splitting
+    concrete_sample - method to use for counterexample generation
+    printing - (bool) whether to print results
 
-    x_star = nothing
-    result = "inconclusive"
-    all_steps = 0
-    # if length(specs) > 1, we are dealing with a disjunction of constraints -> can abort, if we found one SAT
-    for (input_set, output_set) in specs
-
-        if output_set isa AbstractPolytope
-            println("Checking if contained within polytope")
-
-            # contained_within_polytope maximizes violation of polytope's constraints
-            x_star, lower_bound, upper_bound, steps = contained_within_polytope_deep_poly(network, input_set, output_set, params; solver=solver,
-                                                                split=split, concrete_sample=concrete_sample)
-
-            result = get_sat(:contained_within_polytope, lower_bound, upper_bound, params.stop_gap)
-        elseif output_set isa Complement{<:Number, <:AbstractPolytope}
-            println("Checking if polytope can be reached")
-
-            # reaches_polytope minimizes distance to polytope
-            x_star, lower_bound, upper_bound, steps = reaches_polytope_deep_poly(network, input_set, output_set.X, params; solver=solver,
-                                                                split=split, concrete_sample=concrete_sample)
-
-            result = get_sat(:reaches_polytope, lower_bound, upper_bound, params.stop_gap)
-        else
-            @assert false "No implementation for output_set = $(output_set)"
-        end
-
-        all_steps += steps
-
-        printing && println("Steps: ", steps, " - ", [lower_bound, upper_bound], " -> ", result)
-        result == "SAT" && break  # can terminate loop, if one term of the disjunction is true
-    end
-
-    return x_star, all_steps, result
-end
-
-
-function verify_vnnlib(solver::DPNeurifyFV, network, vnnlib_file, params; split=NV.split_important_interval, concrete_sample=:BoundsMaximizer, printing=true)  
+returns:
+    counterexample - or nothing, if no counterexample could be found
+    all_steps - number of steps performed by verifier
+    result - (String) SAT, UNSAT or inconclusive
+"""
+function verify_vnnlib(solver::DPNeurifyFV, network::Network, vnnlib_file, params::PriorityOptimizerParameters; split=NV.split_important_interval, concrete_sample=:BoundsMaximizer, printing=true)  
     n_in = size(network.layers[1].weights, 2)
     n_out = NV.n_nodes(network.layers[end])
     
     rv = read_vnnlib_simple(vnnlib_file, n_in, n_out)
     specs = generate_specs(rv)
     
+    x_star = nothing
+    result = "inconclusive"
+    all_steps = 0
+    # if length(specs) > 1, we are dealing with a disjunction of constraints -> can abort, if we found one SAT
     for (input_set, output_set) in specs
         
         if output_set isa AbstractPolytope
@@ -174,19 +148,41 @@ function verify_vnnlib(solver::DPNeurifyFV, network, vnnlib_file, params; split=
             @assert false "No implementation for output_set = $(output_set)"
         end
 
-        printing && println(result)
+        all_steps += steps
+
+        printing && println("Steps: ", steps, " - ", [lower_bound, upper_bound], " -> ", result)
+        result == "SAT" && break  # can terminate loop, if one term of the disjunction is true
     end
-    
+
+    return x_star, all_steps, result
 end
 
 
-function verify_vnnlib(solver::Ai2z, network, vnnlib_file, params; eager=false, printing=true)  
+"""
+Verifies network for given vnnlib specification.
+
+params:
+    solver - solver instance to use for verification
+    network - network instance
+    vnnlib_file - location of vnnlib specification file 
+    params - parameters for solver
+
+returns:
+    counterexample - or nothing, if no counterexample could be found
+    all_steps - number of steps performed by verifier
+    result - (String) SAT, UNSAT or inconclusive
+"""
+function verify_vnnlib(solver::Ai2z, network::Network, vnnlib_file, params::PriorityOptimizerParameters; eager=false, printing=true)  
     n_in = size(network.layers[1].weights, 2)
     n_out = NV.n_nodes(network.layers[end])
     
     rv = read_vnnlib_simple(vnnlib_file, n_in, n_out)
     specs = generate_specs(rv)
     
+    x_star = nothing
+    result = "inconclusive"
+    all_steps = 0
+    # if length(specs) > 1, we are dealing with a disjunction of constraints -> can abort, if we found one SAT
     for (input_set, output_set) in specs
         
         if output_set isa AbstractPolytope
@@ -207,7 +203,56 @@ function verify_vnnlib(solver::Ai2z, network, vnnlib_file, params; eager=false, 
             @assert false "No implementation for output_set = $(output_set)"
         end
 
-        printing && println(result)
+        all_steps += steps
+
+        printing && println("Steps: ", steps, " - ", [lower_bound, upper_bound], " -> ", result)
+        result == "SAT" && break  # can terminate loop, if one term of the disjunction is true
     end
     
+    return x_star, all_steps, result
 end
+
+
+function verify_vnnlib(solver, dir, params::PriorityOptimizerParameters; logfile=nothing)
+    f = CSV.File(string(dir, "/instances.csv"), header=false)
+
+    n = length(f)
+    properties = String[]
+    results = String[]
+    all_steps = zeros(Integer, n)
+    times = zeros(n)
+
+    old_netpath = nothing
+    net = nothing
+
+    for (i, instance) in enumerate(f)
+        netpath, propertypath, time_limit = instance
+
+        if netpath != old_netpath
+            println("-- loading network ", netpath)
+            net = read_onnx_network(string(dir, "/", netpath))
+            old_netpath = netpath
+        end
+
+        # TODO: maybe include keyword arguments for ZoPE and DPNeurifyFV?
+        time = @elapsed x_star, steps, result = verify_vnnlib(solver, net, string(dir, "/", propertypath), params)
+
+        push!(properties, propertypath)
+        push!(results, result)
+        all_steps[i] = steps
+        times[i] = time
+    end
+
+    if !isnothing(logfile)
+        open(logfile, "w") do f
+            println(f, "property,result,time,steps")
+            [println(f, string(property, ", ", result, ", ", time, ", ", steps)) 
+                    for (property, result, time, steps) in zip(properties, results, times, all_steps)]
+        end
+    end
+
+    return properties, results, times, all_steps
+end
+
+        
+
