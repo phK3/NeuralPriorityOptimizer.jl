@@ -64,9 +64,36 @@ function generate_specs(rv)
 end
 
 
-## directly use specification for verification of property
+function get_sat(type, lower_bound, upper_bound, stop_gap)
+    if type == :contained_within_polytope
+        if lower_bound > 0
+            # at least one constraint of the polytope is violated! Have found a counterexample
+            println("SAT")
+        elseif upper_bound <= stop_gap
+            println("UNSAT")
+        else
+            println("inconclusive")
+        end
+    elseif type == :reaches_polytope 
+        if upper_bound <= params.stop_gap
+            # distance to polytope is smaller than allowed! Have found a counterexample
+            # TODO: could return x_star as counterexample
+            println("SAT")
+        elseif lower_bound > 0
+            # distance to polytope is larger than 0 (and stop_gap), property is proven
+            println("UNSAT")
+        else
+            println("inconclusive")
+        end
+    else
+        throw(ArgumentError("Unknown verification type $type !"))
+    end
+end
 
-function verify_vnnlib(network, vnnlib_file, params; solver=nothing, split=NV.split_important_interval, concrete_sample=:BoundsMaximizer, max_vars=20, method=:DeepPolyRelax)
+
+## directly use specification for verification of property
+function verify_vnnlib(network, vnnlib_file, params; solver=nothing, split=NV.split_important_interval, concrete_sample=:BoundsMaximizer, max_vars=20, 
+                       method=:DeepPolyRelax, printing=true)
     solver = isnothing(solver) ? DPNeurifyFV(method=method, max_vars=max_vars) : solver
 
     n_in = size(network.layers[1].weights, 2)
@@ -84,33 +111,88 @@ function verify_vnnlib(network, vnnlib_file, params; solver=nothing, split=NV.sp
             x_star, lower_bound, upper_bound, steps = contained_within_polytope_deep_poly(network, input_set, output_set, params; solver=solver,
                                                                 split=split, concrete_sample=concrete_sample)
 
-            if lower_bound > 0
-                # at least one constraint of the polytope is violated! Have found a counterexample
-                println("SAT")
-            elseif upper_bound <= params.stop_gap
-                println("UNSAT")
-            else
-                println("inconclusive")
-            end
+            result = get_sat(:contained_within_polytope, lower_bound, upper_bound, params.stop_gap)
         elseif output_set isa Complement{<:Number, <:AbstractPolytope}
             println("Checking if polytope can be reached")
 
             # reaches_polytope minimizes distance to polytope
             x_star, lower_bound, upper_bound, steps = reaches_polytope_deep_poly(network, input_set, output_set.X, params; solver=solver,
                                                                 split=split, concrete_sample=concrete_sample)
-            if upper_bound <= params.stop_gap
-                # distance to polytope is smaller than allowed! Have found a counterexample
-                # TODO: could return x_star as counterexample
-                println("SAT")
-            elseif lower_bound > 0
-                # distance to polytope is larger than 0 (and stop_gap), property is proven
-                println("UNSAT")
-            else
-                println("inconclusive")
-            end
+
+            result = get_sat(:reaches_polytope, lower_bound, upper_bound, params.stop_gap)
         else
             @assert false "No implementation for output_set = $(output_set)"
         end
+
+        printing && println(result)
     end
 
+    return x_star, lower_bound, upper_bound, steps
+end
+
+
+function verify_vnnlib(solver::DPNeurifyFV, network, vnnlib_file, params; split=NV.split_important_interval, concrete_sample=:BoundsMaximizer, printing=true)  
+    n_in = size(network.layers[1].weights, 2)
+    n_out = NV.n_nodes(network.layers[end])
+    
+    rv = read_vnnlib_simple(vnnlib_file, n_in, n_out)
+    specs = generate_specs(rv)
+    
+    for (input_set, output_set) in specs
+        
+        if output_set isa AbstractPolytope
+            println("Checking if contained within polytope")
+            
+            # contained_within_polytope maximizes violation of polytope's constraints
+            x_star, lower_bound, upper_bound, steps = contained_within_polytope_deep_poly(network, input_set, output_set, params; solver=solver,
+                                                                split=split, concrete_sample=concrete_sample)
+            
+            result = get_sat(:contained_within_polytope, lower_bound, upper_bound, params.stop_gap) 
+        elseif output_set isa Complement{<:Number, <:AbstractPolytope}
+            println("Checking if polytope can be reached")
+            
+            # reaches_polytope minimizes distance to polytope
+            x_star, lower_bound, upper_bound, steps = reaches_polytope_deep_poly(network, input_set, output_set.X, params; solver=solver,
+                                                                split=split, concrete_sample=concrete_sample)
+            result = get_sat(:reaches_polytope, lower_bound, upper_bound, params.stop_gap)
+        else
+            @assert false "No implementation for output_set = $(output_set)"
+        end
+
+        printing && println(result)
+    end
+    
+end
+
+
+function verify_vnnlib(solver::Ai2z, network, vnnlib_file, params; eager=false, printing=true)  
+    n_in = size(network.layers[1].weights, 2)
+    n_out = NV.n_nodes(network.layers[end])
+    
+    rv = read_vnnlib_simple(vnnlib_file, n_in, n_out)
+    specs = generate_specs(rv)
+    
+    for (input_set, output_set) in specs
+        
+        if output_set isa AbstractPolytope
+            println("Checking if contained within polytope")
+            
+            # contained_within_polytope maximizes violation of polytope's constraints
+            x_star, lower_bound, upper_bound, steps = contained_within_polytope(network, input_set, output_set, params; solver=solver)
+            
+            result = get_sat(:contained_within_polytope, lower_bound, upper_bound, params.stop_gap)    
+        elseif output_set isa Complement{<:Number, <:AbstractPolytope}
+            println("Checking if polytope can be reached")
+            
+            # reaches_polytope minimizes distance to polytope
+            x_star, lower_bound, upper_bound, steps = reaches_polytope_binary(network, input_set, output_set.X, params; solver=solver,
+                                                                eager=eager)
+            result = get_sat(:reaches_polytope, lower_bound, upper_bound, params.stop_gap)
+        else
+            @assert false "No implementation for output_set = $(output_set)"
+        end
+
+        printing && println(result)
+    end
+    
 end
