@@ -230,7 +230,7 @@ function verify_vnnlib(solver, dir, params::PriorityOptimizerParameters; logfile
 
         if netpath != old_netpath
             println("-- loading network ", netpath)
-            net = read_onnx_network(string(dir, "/", netpath))
+            net = read_onnx_network(string(dir, "/", netpath), dtype=Float64)
             old_netpath = netpath
         end
 
